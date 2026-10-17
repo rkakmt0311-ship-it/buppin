@@ -28,6 +28,11 @@ function 初期設定() {
   let sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) sh = ss.insertSheet(SHEET_NAME, 0);
   if (sh.getLastRow() === 0) sh.appendRow(HEADERS);
+  // 引き継ぎデータ（INITIAL_DATA.gs、移行時だけ置く）があり、シートが空なら書き込む
+  if (typeof INITIAL_DATA !== 'undefined' && sh.getLastRow() <= 1) {
+    const rows = INITIAL_DATA.map((r) => HEADERS.map((h) => (r[h] == null ? '' : r[h])));
+    if (rows.length) sh.getRange(2, 1, rows.length, HEADERS.length).setValues(rows);
+  }
   sh.setFrozenRows(1);
   sh.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
   photoFolder_();

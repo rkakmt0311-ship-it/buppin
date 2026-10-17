@@ -6,3 +6,4 @@ output/
 docs/items.csv
 docs/images/*.svg
 .claude/
+build/
