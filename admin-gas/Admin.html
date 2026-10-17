@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: hsl(215 19% 92%); --fg: hsl(222 23% 21%); --card: #fff; --border: hsl(220 15% 88%);
+    --input: hsl(218 15% 82%); --ring: hsl(211 37% 48%); --primary: hsl(211 37% 39%);
+    --secondary: hsl(211 35% 94%); --muted: hsl(218 19% 94%); --muted-fg: hsl(218 10% 47%);
+    --good: hsl(158 35% 30%); --bad: hsl(3 54% 44%); --r: 14px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'Noto Sans JP', system-ui, sans-serif; font-size: 15px; line-height: 1.6; -webkit-tap-highlight-color: transparent; }
+  button, input, textarea { font: inherit; color: inherit; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px 96px; }
+  .top { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 12px 0 10px; }
+  .bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .bar h1 { margin: 0; font-size: 17px; }
+  .bar small { color: var(--muted-fg); font-size: 12px; }
+  .search { display: flex; align-items: center; min-height: 50px; padding: 0 14px; border: 1px solid var(--input); border-radius: var(--r); background: var(--card); }
+  .search:focus-within { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 17px; min-height: 46px; }
+  .list { display: grid; gap: 8px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--card); }
+  .row.hidden-item { opacity: .55; }
+  .row-main { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; border: 0; padding: 0; background: none; text-align: left; }
+  .thumb { flex: none; width: 56px; height: 56px; border-radius: 10px; background: var(--secondary); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--muted-fg); }
+  .thumb img { width: 100%; height: 100%; object-fit: contain; }
+  .row-name { font-weight: 700; line-height: 1.35; word-break: break-word; }
+  .row-sub { font-size: 12px; color: var(--muted-fg); }
+  .stepper { flex: none; display: flex; align-items: center; gap: 4px; }
+  .stepper button { width: 40px; height: 40px; border: 1px solid var(--input); border-radius: 10px; background: var(--card); font-size: 20px; font-weight: 700; line-height: 1; }
+  .stepper button:disabled { opacity: .35; }
+  .count { min-width: 52px; text-align: center; font-size: 12px; color: var(--muted-fg); line-height: 1.2; }
+  .count b { display: block; font-size: 18px; color: var(--good); }
+  .count b.zero { color: var(--bad); }
+  .fab { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 6; min-height: 56px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--primary); color: #fff; font-weight: 700; font-size: 16px; box-shadow: 0 4px 14px hsl(222 23% 21% / .25); }
+  .empty { padding: 40px 0; text-align: center; color: var(--muted-fg); }
+
+  /* 編集画面 */
+  .sheet { position: fixed; inset: 0; z-index: 20; display: none; overflow-y: auto; background: var(--bg); }
+  .sheet.on { display: block; }
+  .sheet-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--border); }
+  .sheet-head h2 { margin: 0; font-size: 16px; }
+  .btn { min-height: 44px; padding: 0 16px; border: 1px solid var(--input); border-radius: 10px; background: var(--card); font-weight: 700; }
+  .btn-primary { border-color: var(--primary); background: var(--primary); color: #fff; }
+  .btn:disabled { opacity: .5; }
+  form { max-width: 560px; margin: 0 auto; padding: 16px 16px 40px; display: grid; gap: 14px; }
+  .group { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r); background: var(--card); }
+  .group-title { font-size: 13px; font-weight: 700; color: var(--muted-fg); }
+  label.f { display: grid; gap: 4px; font-size: 14px; font-weight: 500; }
+  label.f input, label.f textarea { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid var(--input); border-radius: 10px; background: #fff; font-size: 16px; outline: 0; }
+  label.f input:focus, label.f textarea:focus { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .photo-field { display: flex; gap: 12px; align-items: center; }
+  .photo-prev { flex: none; width: 96px; height: 96px; border-radius: 10px; background: var(--secondary); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted-fg); }
+  .photo-prev img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-btns { display: grid; gap: 8px; flex: 1; }
+  .photo-btns label { display: flex; align-items: center; justify-content: center; min-height: 44px; border: 1px solid var(--input); border-radius: 10px; background: #fff; font-weight: 700; font-size: 14px; }
+  .photo-btns input { display: none; }
+  .check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; }
+  .check input { width: 22px; height: 22px; }
+  .error { display: none; padding: 10px 12px; border-radius: 10px; background: hsl(3 54% 48% / .1); color: var(--bad); font-size: 14px; }
+  .error.on { display: block; }
+  .toast { position: fixed; left: 50%; bottom: calc(88px + env(safe-area-inset-bottom)); z-index: 30; transform: translateX(-50%); padding: 10px 18px; border-radius: 999px; background: hsl(222 23% 21%); color: #fff; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="bar"><h1>物品管理</h1><small id="who"></small></div>
+    <label class="search"><input id="q" type="search" placeholder="物品の名前で検索" autocomplete="off" aria-label="物品の名前で検索"></label>
+  </header>
+  <main class="list" id="list"><div class="empty">読み込み中…</div></main>
+</div>
+<button class="fab" id="add" type="button">＋ 物品を追加</button>
+
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div class="sheet-head">
+    <button class="btn" type="button" id="cancel">やめる</button>
+    <h2 id="sheet-title">物品を追加</h2>
+    <button class="btn btn-primary" type="submit" form="form" id="save">保存</button>
+  </div>
+  <form id="form" novalidate>
+    <div class="error" id="error"></div>
+    <div class="group">
+      <div class="group-title">物品</div>
+      <div class="photo-field">
+        <div class="photo-prev" id="prev-photo">写真なし</div>
+        <div class="photo-btns">
+          <label>写真を撮る<input type="file" accept="image/*" capture="environment" data-target="photo"></label>
+          <label>アルバムから選ぶ<input type="file" accept="image/*" data-target="photo"></label>
+        </div>
+      </div>
+      <label class="f">名前<input name="name" required></label>
+      <label class="f">カテゴリ<input name="category" placeholder="例：撮影機材"></label>
+      <div class="two">
+        <label class="f">総数<input name="total" type="number" inputmode="numeric" min="0" required></label>
+        <label class="f">使える数<input name="available" type="number" inputmode="numeric" min="0" placeholder="空欄＝総数"></label>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-title">配置</div>
+      <div class="photo-field">
+        <div class="photo-prev" id="prev-locPhoto">写真なし</div>
+        <div class="photo-btns">
+          <label>写真を撮る<input type="file" accept="image/*" capture="environment" data-target="locPhoto"></label>
+          <label>アルバムから選ぶ<input type="file" accept="image/*" data-target="locPhoto"></label>
+        </div>
+      </div>
+      <label class="f">部屋<input name="room" placeholder="例：A棟3階 準備室"></label>
+      <label class="f">棚・置き場所<input name="shelf" placeholder="例：奥の棚 2段目"></label>
+      <label class="f">場所のメモ<input name="note" placeholder="例：鍵は事務室"></label>
+    </div>
+    <div class="group">
+      <label class="f">説明<textarea name="description" rows="2"></textarea></label>
+      <label class="check"><input type="checkbox" name="hidden">学生ページに表示しない</label>
+    </div>
+  </form>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const SITE_URL = <?!= JSON.stringify(siteUrl) ?>;
+const EMAIL = <?!= JSON.stringify(email) ?>;
+</script>
+<script>
+const $ = (id) => document.getElementById(id);
+let items = [];
+let editing = null;
+const pending = { photo: null, locPhoto: null };
+
+// サーバー（Code.gs）の関数を Promise で呼ぶ
+const call = (fn, ...args) => new Promise((resolve, reject) => {
+  google.script.run.withSuccessHandler(resolve).withFailureHandler((e) => reject(e && e.message ? e : new Error(String(e))))[fn](...args);
+});
+
+function norm(s) {
+  return String(s || '').normalize('NFKC').toLowerCase()
+    .replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function imageUrl(v, size) {
+  if (!v) return '';
+  const drive = String(v).match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]+)/);
+  if (drive) return `https://drive.google.com/thumbnail?id=${drive[1]}&sz=w${size}`;
+  if (/^https?:\/\//.test(v)) return v;
+  return `${SITE_URL}images/${/\.webp$/i.test(v) ? 'thumb/' : ''}${encodeURIComponent(v)}`;
+}
+function toast(msg) {
+  $('toast').textContent = msg; $('toast').classList.add('on');
+  clearTimeout(toast.t); toast.t = setTimeout(() => $('toast').classList.remove('on'), 1800);
+}
+
+function render() {
+  const terms = norm($('q').value).trim().split(/\s+/).filter(Boolean);
+  const hits = items.filter((o) => {
+    const key = norm([o.name, o.category, o.room, o.shelf].join(' '));
+    return terms.every((t) => key.includes(t));
+  });
+  $('list').innerHTML = hits.length ? hits.map((o) => {
+    const src = imageUrl(o.photo, 160);
+    const avail = Number(o.available), total = Number(o.total);
+    return `<div class="row${o.visible ? ' hidden-item' : ''}" data-id="${esc(o.id)}">
+      <button class="row-main" type="button" data-edit="${esc(o.id)}">
+        <span class="thumb">${src ? `<img src="${esc(src)}" alt="" loading="lazy">` : '写真なし'}</span>
+        <span><span class="row-name">${esc(o.name)}</span><br><span class="row-sub">${esc([o.room, o.shelf].filter(Boolean).join('・') || '配置 未登録')}${o.visible ? '・非表示' : ''}</span></span>
+      </button>
+      <div class="stepper">
+        <button type="button" data-step="-1" aria-label="${esc(o.name)}の使える数を減らす" ${avail <= 0 ? 'disabled' : ''}>−</button>
+        <span class="count"><b class="${avail <= 0 ? 'zero' : ''}">${esc(o.available)}</b>/ ${esc(o.total)}</span>
+        <button type="button" data-step="1" aria-label="${esc(o.name)}の使える数を増やす" ${avail >= total ? 'disabled' : ''}>＋</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty">${items.length ? '見つかりませんでした' : 'まだ物品がありません。「＋ 物品を追加」から登録してください。'}</div>`;
+}
+
+async function load() {
+  try {
+    items = await call('getItems');
+    items.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    render();
+  } catch (e) {
+    $('list').innerHTML = `<div class="empty">読み込めませんでした：${esc(e.message)}</div>`;
+  }
+}
+
+async function step(id, delta, rowEl) {
+  const o = items.find((x) => x.id === id);
+  const before = o.available;
+  o.available = String(Math.max(0, Math.min(Number(o.total), Number(o.available) + delta)));
+  render(); // 先に画面へ反映して、保存は裏で行う
+  try {
+    o.available = String(await call('adjustAvailable', id, delta));
+    render();
+  } catch (e) {
+    o.available = before; render();
+    toast('保存できませんでした：' + e.message);
+  }
+}
+
+function openSheet(item) {
+  editing = item || null;
+  pending.photo = pending.locPhoto = null;
+  const f = $('form');
+  f.reset();
+  $('error').classList.remove('on');
+  $('sheet-title').textContent = item ? '物品を編集' : '物品を追加';
+  if (item) {
+    ['name', 'category', 'total', 'available', 'room', 'shelf', 'note', 'description'].forEach((k) => { f.elements[k].value = item[k] || ''; });
+    f.elements.hidden.checked = !!item.visible;
+  }
+  setPreview('photo', item && imageUrl(item.photo, 300));
+  setPreview('locPhoto', item && imageUrl(item.locPhoto, 300));
+  $('sheet').classList.add('on');
+  $('sheet').scrollTop = 0;
+}
+function closeSheet() { $('sheet').classList.remove('on'); }
+
+function setPreview(target, src) {
+  $('prev-' + target).innerHTML = src ? `<img src="${esc(src)}" alt="">` : '写真なし';
+}
+
+// スマホの写真は大きいので、長辺1600pxのJPEGに縮小してから送る
+function shrink(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      const url = c.toDataURL('image/jpeg', 0.82);
+      resolve({ url, data: url.split(',')[1], type: 'image/jpeg' });
+    };
+    img.onerror = () => reject(new Error('この写真は読み込めませんでした'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+document.querySelectorAll('input[type=file]').forEach((input) => {
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const p = await shrink(file);
+      pending[input.dataset.target] = p;
+      setPreview(input.dataset.target, p.url);
+    } catch (e) { toast(e.message); }
+    input.value = '';
+  });
+});
+
+$('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = $('form');
+  const data = {
+    id: editing ? editing.id : '',
+    photo: editing ? editing.photo : '', locPhoto: editing ? editing.locPhoto : '',
+    hidden: f.elements.hidden.checked,
+  };
+  ['name', 'category', 'total', 'available', 'room', 'shelf', 'note', 'description'].forEach((k) => { data[k] = f.elements[k].value.trim(); });
+  if (pending.photo) data.newPhoto = { data: pending.photo.data, type: pending.photo.type };
+  if (pending.locPhoto) data.newLocPhoto = { data: pending.locPhoto.data, type: pending.locPhoto.type };
+  $('save').disabled = true; $('save').textContent = '保存中…';
+  try {
+    await call('saveItem', data);
+    closeSheet();
+    toast('保存しました');
+    load();
+  } catch (err) {
+    $('error').textContent = err.message; $('error').classList.add('on');
+    $('sheet').scrollTop = 0;
+  } finally {
+    $('save').disabled = false; $('save').textContent = '保存';
+  }
+});
+
+$('who').textContent = EMAIL;
+$('q').addEventListener('input', render);
+$('add').addEventListener('click', () => openSheet(null));
+$('cancel').addEventListener('click', closeSheet);
+$('list').addEventListener('click', (e) => {
+  const edit = e.target.closest('[data-edit]');
+  if (edit) return openSheet(items.find((x) => x.id === edit.dataset.edit));
+  const s = e.target.closest('[data-step]');
+  if (s) step(s.closest('.row').dataset.id, Number(s.dataset.step));
+});
+load();
+</script>
+</body>
+</html>

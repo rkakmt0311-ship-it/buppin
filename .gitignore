@@ -1,0 +1,8 @@
+node_modules/
+# 引き継ぎで出力したCSV（申請者の名前やメールを含むので公開しない）
+output/
+*.zip
+# 手元確認用のサンプル（架空の物品）
+docs/items.csv
+docs/images/*.svg
+.claude/

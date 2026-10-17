@@ -1,0 +1,12 @@
+{
+  "name": "teikyo-buppin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "convert": "node tools/convert-export.mjs",
+    "preview": "node tools/serve.cjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.5"
+  }
+}

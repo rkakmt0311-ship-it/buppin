@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e8ebef">
+<title>物品さがし</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* 今のアプリのデザインB（淡い青グレー地・白い角丸カード）に合わせた配色 */
+  :root {
+    --bg: hsl(215 19% 92%);
+    --fg: hsl(222 23% 21%);
+    --card: #fff;
+    --border: hsl(220 15% 88%);
+    --input: hsl(218 15% 82%);
+    --ring: hsl(211 37% 48%);
+    --primary: hsl(211 37% 39%);
+    --secondary: hsl(211 35% 94%);
+    --muted: hsl(218 19% 94%);
+    --muted-fg: hsl(218 10% 47%);
+    --good: hsl(158 35% 30%);
+    --good-bg: hsl(158 35% 39% / .12);
+    --bad: hsl(3 54% 44%);
+    --bad-bg: hsl(3 54% 48% / .1);
+    --r: 14px;
+    --shadow: 0 1px 3px hsl(222 23% 21% / .07);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: 'Noto Sans JP', system-ui, sans-serif;
+    font-size: 15px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px calc(32px + env(safe-area-inset-bottom)); }
+
+  /* 検索窓（スクロールしても上に残る） */
+  .top { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: calc(12px + env(safe-area-inset-top)) 0 10px; }
+  .title { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--muted-fg); }
+  .search { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 0 14px; border: 1px solid var(--input); border-radius: var(--r); background: var(--card); }
+  .search:focus-within { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .search svg { flex: none; width: 22px; height: 22px; color: var(--muted-fg); }
+  .search input { flex: 1; min-width: 0; min-height: 52px; border: 0; outline: 0; background: transparent; font: inherit; font-size: 18px; color: var(--fg); }
+  .search input::-webkit-search-cancel-button { display: none; }
+  .clear { flex: none; display: none; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--muted); color: var(--muted-fg); font-size: 18px; line-height: 36px; }
+  .clear.on { display: block; }
+  .meta { margin: 8px 2px 0; font-size: 13px; color: var(--muted-fg); }
+
+  /* 結果カード */
+  .list { display: grid; gap: 12px; margin-top: 4px; }
+  .card { overflow: hidden; border: 1px solid var(--border); border-radius: var(--r); background: var(--card); box-shadow: var(--shadow); }
+  .head { display: flex; gap: 12px; padding: 12px; }
+  .thumb { flex: none; width: 84px; height: 84px; border: 0; padding: 0; border-radius: 10px; background: var(--secondary); overflow: hidden; }
+  .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .info { min-width: 0; flex: 1; }
+  .name { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.4; word-break: break-word; }
+  .cat { margin-top: 2px; font-size: 13px; color: var(--muted-fg); }
+  .qty { display: inline-flex; align-items: baseline; gap: 4px; margin-top: 6px; padding: 2px 10px; border-radius: 999px; background: var(--good-bg); color: var(--good); font-size: 13px; font-weight: 700; }
+  .qty b { font-size: 18px; }
+  .qty.zero { background: var(--bad-bg); color: var(--bad); }
+  .loc { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--border); background: hsl(215 19% 98%); }
+  .loc-text { min-width: 0; flex: 1; }
+  .loc-label { font-size: 12px; color: var(--muted-fg); }
+  .loc-room { font-size: 15px; font-weight: 700; line-height: 1.4; }
+  .loc-shelf { font-size: 14px; line-height: 1.5; }
+  .loc-note { margin-top: 2px; font-size: 13px; color: var(--muted-fg); }
+  .loc-photo { flex: none; width: 112px; height: 84px; border: 0; padding: 0; border-radius: 10px; background: var(--secondary); overflow: hidden; }
+  .loc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .noimg { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 11px; color: var(--muted-fg); }
+  mark { background: hsl(45 90% 75%); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+  .empty, .loading { padding: 48px 16px; text-align: center; color: var(--muted-fg); }
+  .empty b { display: block; margin-bottom: 4px; color: var(--fg); font-size: 16px; }
+
+  /* 写真の拡大表示 */
+  .viewer { position: fixed; inset: 0; z-index: 50; display: none; flex-direction: column; background: rgb(0 0 0 / .92); }
+  .viewer.on { display: flex; }
+  .viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; color: #fff; }
+  .viewer-cap { min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .viewer-close { flex: none; min-width: 44px; height: 44px; border: 0; border-radius: 999px; background: rgb(255 255 255 / .15); color: #fff; font: inherit; font-size: 15px; font-weight: 700; padding: 0 16px; }
+  .viewer-img { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 8px calc(16px + env(safe-area-inset-bottom)); }
+  .viewer-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 class="title" id="site-title">物品さがし</h1>
+    <label class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="物品の名前で検索" aria-label="物品の名前で検索">
+      <button class="clear" id="clear" type="button" aria-label="検索をクリア">×</button>
+    </label>
+    <p class="meta" id="meta"></p>
+  </header>
+  <main class="list" id="list"><div class="loading">読み込み中…</div></main>
+</div>
+
+<div class="viewer" id="viewer" role="dialog" aria-modal="true">
+  <div class="viewer-bar"><span class="viewer-cap" id="viewer-cap"></span><button class="viewer-close" id="viewer-close" type="button">閉じる</button></div>
+  <div class="viewer-img"><img id="viewer-img" alt=""></div>
+</div>
+
+<script>
+/*
+ * 設定：データの読み込み先。
+ * Googleスプレッドシートの「ウェブに公開」→ CSV のURLを SHEET_CSV_URL に入れると、
+ * スプレッドシートの内容がそのまま表示される。空のときは同じフォルダの items.csv を読む。
+ * 写真の欄はURL（Googleドライブの共有リンクも可）か、images/ フォルダ内のファイル名。
+ */
+const CONFIG = {
+  SITE_TITLE: '帝京科学大学 物品さがし',
+  SHEET_CSV_URL: '',
+  LOCAL_CSV: 'items.csv',
+  IMAGE_DIR: 'images/',
+};
+
+// スプレッドシートの見出し名 → 内部の項目名
+const COLUMNS = {
+  '物品ID': 'id', '名前': 'name', 'カテゴリ': 'category', '説明': 'description',
+  '総数': 'total', '使える数': 'available', '部屋': 'room', '棚': 'shelf',
+  '場所メモ': 'note', '物品写真': 'photo', '場所写真': 'locPhoto', '表示': 'visible',
+};
+
+const $ = (id) => document.getElementById(id);
+let items = [];
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', quoted = false;
+  text = text.replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else quoted = false; }
+      else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += c;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((v) => v.trim()));
+}
+
+function toItems(rows) {
+  const keys = rows[0].map((h) => COLUMNS[h.trim()] || null);
+  return rows.slice(1).map((r) => {
+    const o = {};
+    keys.forEach((k, i) => { if (k) o[k] = (r[i] || '').trim(); });
+    o.total = parseInt(o.total, 10);
+    o.available = parseInt(o.available, 10);
+    if (Number.isNaN(o.available)) o.available = o.total;
+    o.key = norm([o.name, o.category, o.room, o.shelf, o.note, o.description].join(' '));
+    o.nameKey = norm(o.name);
+    return o;
+  }).filter((o) => o.name && !/^(false|いいえ|非表示|0)$/i.test(o.visible || ''));
+}
+
+// 全角/半角・大文字小文字・カタカナ/ひらがなの違いを無視して検索する
+function norm(s) {
+  return (s || '').normalize('NFKC').toLowerCase()
+    .replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    .replace(/\s+/g, ' ');
+}
+
+function imageUrl(v, size) {
+  if (!v) return '';
+  const drive = v.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]+)/);
+  if (drive) return `https://drive.google.com/thumbnail?id=${drive[1]}&sz=w${size}`;
+  if (/^https?:\/\//.test(v)) return v;
+  // 引き継いだ写真は一覧用(thumb)と拡大用(full)の2サイズがある
+  const dir = /\.webp$/i.test(v) ? (size <= 400 ? 'thumb/' : 'full/') : '';
+  return CONFIG.IMAGE_DIR + dir + encodeURIComponent(v);
+}
+
+function esc(s) {
+  return (s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// 検索語に一致した部分に印をつける（ひらがな・カタカナの違いも考慮）
+function highlight(text, terms) {
+  if (!terms.length || !text) return esc(text);
+  const n = norm(text);
+  if (n.length !== text.length) return esc(text);
+  const marks = new Array(text.length).fill(false);
+  terms.forEach((t) => { let i = n.indexOf(t); while (t && i !== -1) { for (let j = i; j < i + t.length; j++) marks[j] = true; i = n.indexOf(t, i + 1); } });
+  let out = '', open = false;
+  for (let i = 0; i < text.length; i++) {
+    if (marks[i] && !open) { out += '<mark>'; open = true; }
+    if (!marks[i] && open) { out += '</mark>'; open = false; }
+    out += esc(text[i]);
+  }
+  return out + (open ? '</mark>' : '');
+}
+
+function photo(cls, v, size, alt, caption) {
+  const src = imageUrl(v, size);
+  const inner = src
+    ? `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'noimg',textContent:'写真なし'}))">`
+    : '<span class="noimg">写真なし</span>';
+  const data = src ? ` data-full="${esc(imageUrl(v, 1600))}" data-cap="${esc(caption)}"` : ' disabled';
+  return `<button class="${cls}" type="button"${data} aria-label="${esc(caption)}を拡大">${inner}</button>`;
+}
+
+function card(o, terms) {
+  const zero = o.available <= 0;
+  const qty = Number.isNaN(o.total) ? '' :
+    `<div class="qty${zero ? ' zero' : ''}">${zero ? 'いまは0' : `使える <b>${o.available}</b>`} / 全${o.total}</div>`;
+  const where = [o.room, o.shelf].filter(Boolean).join('・') || '未登録';
+  return `<article class="card">
+    <div class="head">
+      ${photo('thumb', o.photo, 200, o.name, o.name)}
+      <div class="info">
+        <h2 class="name">${highlight(o.name, terms)}</h2>
+        ${o.category ? `<div class="cat">${highlight(o.category, terms)}</div>` : ''}
+        ${qty}
+      </div>
+    </div>
+    <div class="loc">
+      <div class="loc-text">
+        <div class="loc-label">配置</div>
+        <div class="loc-room">${highlight(o.room || '未登録', terms)}</div>
+        ${o.shelf ? `<div class="loc-shelf">${highlight(o.shelf, terms)}</div>` : ''}
+        ${o.note ? `<div class="loc-note">${highlight(o.note, terms)}</div>` : ''}
+      </div>
+      ${photo('loc-photo', o.locPhoto, 280, `${o.name}の配置`, `${o.name}の配置：${where}`)}
+    </div>
+  </article>`;
+}
+
+function render() {
+  const q = norm($('q').value).trim();
+  const terms = q ? q.split(' ').filter(Boolean) : [];
+  $('clear').classList.toggle('on', !!q);
+  let hits = terms.length ? items.filter((o) => terms.every((t) => o.key.includes(t))) : items.slice();
+  if (terms.length) {
+    // 名前が検索語で始まるもの → 名前に含むもの → それ以外（場所などで一致）の順
+    const rank = (o) => (o.nameKey.startsWith(terms[0]) ? 0 : terms.every((t) => o.nameKey.includes(t)) ? 1 : 2);
+    hits.sort((a, b) => rank(a) - rank(b));
+  }
+  $('meta').textContent = terms.length ? `${hits.length}件` : `全${items.length}件`;
+  $('list').innerHTML = hits.length
+    ? hits.map((o) => card(o, terms)).join('')
+    : `<div class="empty"><b>見つかりませんでした</b>別の言葉や、ひらがな・カタカナで試してみてください。</div>`;
+}
+
+async function load() {
+  const url = CONFIG.SHEET_CSV_URL || CONFIG.LOCAL_CSV;
+  const res = await fetch(url, { cache: 'no-cache' });
+  if (!res.ok) throw new Error(res.status);
+  items = toItems(parseCsv(await res.text()));
+  items.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+}
+
+function openViewer(btn) {
+  $('viewer-img').src = btn.dataset.full;
+  $('viewer-cap').textContent = btn.dataset.cap;
+  $('viewer').classList.add('on');
+  history.pushState({ viewer: true }, '');
+}
+function closeViewer() { $('viewer').classList.remove('on'); $('viewer-img').removeAttribute('src'); }
+
+document.title = $('site-title').textContent = CONFIG.SITE_TITLE;
+$('q').addEventListener('input', render);
+$('q').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+$('clear').addEventListener('click', () => { $('q').value = ''; render(); $('q').focus(); });
+$('list').addEventListener('click', (e) => { const b = e.target.closest('button[data-full]'); if (b) openViewer(b); });
+$('viewer-close').addEventListener('click', () => history.back());
+$('viewer').addEventListener('click', (e) => { if (e.target === e.currentTarget || e.target.classList.contains('viewer-img')) history.back(); });
+window.addEventListener('popstate', closeViewer);
+
+load().then(render).catch(() => {
+  $('list').innerHTML = '<div class="empty"><b>読み込めませんでした</b>電波のよい場所で、ページを開き直してください。</div>';
+});
+</script>
+</body>
+</html>
