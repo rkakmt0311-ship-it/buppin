@@ -73,12 +73,36 @@ function findRoot(dir) {
   return null;
 }
 
+// 写真の欄にファイル共有サービス（kuku.lu / FileNow）の共有ページが登録されていた場合、
+// ページ内に書かれている本物の画像URLから画像を取得する（同じ画像は1回だけ取得）
+const shareCache = new Map();
+async function resolveSharePage(src) {
+  if (!src.endsWith('.bin')) return null;
+  const html = fs.readFileSync(src, 'utf8');
+  const m = html.match(/i\.kuku\.lu\/\?url=([^"&'\s]+)/);
+  if (!m) return null;
+  const url = decodeURIComponent(m[1]);
+  if (!/^https:\/\/[\w-]+\.filenowsv\.com\/files\//.test(url)) return null;
+  if (shareCache.has(url)) return shareCache.get(url);
+  const cacheDir = path.join(OUT, 'filenow');
+  fs.mkdirSync(cacheDir, { recursive: true });
+  const file = path.join(cacheDir, path.basename(new URL(url).pathname));
+  if (!fs.existsSync(file)) {
+    const res = await fetch(url);
+    if (!res.ok) { shareCache.set(url, null); return null; }
+    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+  }
+  shareCache.set(url, file);
+  return file;
+}
+
 async function saveImage(src, name) {
   // スマホ写真の向き情報（EXIF）を反映してから縮小する。
   // 画像ライブラリはWindowsの長いパス（260文字超）に書き込めないため、メモリ上で作ってからNodeで書き込む
-  const thumb = await sharp(src).rotate().resize({ width: 360, height: 360, fit: 'inside', withoutEnlargement: true })
+  const input = fs.readFileSync(src);
+  const thumb = await sharp(input).rotate().resize({ width: 360, height: 360, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 72 }).toBuffer();
-  const full = await sharp(src).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+  const full = await sharp(input).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 80 }).toBuffer();
   fs.writeFileSync(path.join(IMG, 'thumb', name), thumb);
   fs.writeFileSync(path.join(IMG, 'full', name), full);
@@ -112,7 +136,8 @@ async function main() {
     // 変換できない形式（HEICなど）が混ざっていても、ほかの物品の変換は続ける
     const convert = async (recorded, out, label) => {
       if (!recorded) return '';
-      const src = findFile(dir, recorded);
+      let src = findFile(dir, recorded);
+      if (src) src = (await resolveSharePage(src)) || src;
       if (!src) { missing.push(`${it['名前']}（${label}）：ZIPに入っていません`); return ''; }
       try { await saveImage(src, out); return out; }
       catch (e) { missing.push(`${it['名前']}（${label}）：変換できませんでした ${path.basename(src)}（${e.message}）`); return ''; }
