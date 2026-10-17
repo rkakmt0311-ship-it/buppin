@@ -1,7 +1,8 @@
 /**
  * 物品管理（管理者用）— スプレッドシートに紐づいた Apps Script。
- * ウェブアプリは「アクセスしているユーザー」として実行するため、
- * スプレッドシートの編集権限がない人は書き込めない（権限はGoogleの共有設定で管理する）。
+ * ウェブアプリは持ち主として実行し、ログインなしで開ける。
+ * 管理者用URLを知っている人だけが使える（URLは管理者にだけ渡す）。
+ * 写真は持ち主のGoogleドライブの「物品写真」フォルダに保存する。
  */
 
 // 学生用ページのURL（GitHub Pages）。引き継いだ写真（ファイル名だけの写真）を表示するのに使う。
@@ -13,16 +14,14 @@ const FIELDS = ['id', 'name', 'category', 'description', 'total', 'available', '
 const PHOTO_FOLDER_NAME = '物品写真';
 
 function doGet() {
-  const page = canEdit_() ? 'Admin' : 'NoAccess';
-  const t = HtmlService.createTemplateFromFile(page);
+  const t = HtmlService.createTemplateFromFile('Admin');
   t.siteUrl = STUDENT_SITE_URL;
-  t.email = Session.getActiveUser().getEmail();
   return t.evaluate()
     .setTitle('物品管理')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
 
-/** 初回だけ持ち主が実行する：シートの見出しと写真フォルダを用意する */
+/** 初回だけ持ち主が実行する：シートの見出し・引き継ぎデータ・写真フォルダを用意する */
 function 初期設定() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(SHEET_NAME);
@@ -36,22 +35,11 @@ function 初期設定() {
   sh.setFrozenRows(1);
   sh.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
   photoFolder_();
-  SpreadsheetApp.getUi().alert('初期設定が終わりました。');
+  ss.toast('初期設定が終わりました。', '物品管理', 10);
 }
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('物品管理').addItem('初期設定', '初期設定').addToUi();
-}
-
-function canEdit_() {
-  try {
-    const email = Session.getActiveUser().getEmail();
-    const file = DriveApp.getFileById(SpreadsheetApp.getActiveSpreadsheet().getId());
-    if (file.getOwner() && file.getOwner().getEmail() === email) return true;
-    return file.getEditors().some((u) => u.getEmail() === email);
-  } catch (e) {
-    return false; // 閲覧権限もない場合は開けずに例外になる
-  }
 }
 
 function sheet_() {
