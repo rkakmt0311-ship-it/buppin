@@ -100,13 +100,16 @@ async function main() {
   for (const it of items) {
     const id = it['物品ID'];
     const safeId = id.replace(/[^\w-]/g, '_');
-    let photo = '', locPhoto = '';
-    const p = findFile(dir, it['写真ファイル名']);
-    if (p) { photo = `${safeId}.webp`; await saveImage(p, photo); }
-    else if (it['写真ファイル名']) missing.push(`${it['名前']}（物品写真）`);
-    const m = findFile(dir, it['地図画像ファイル名']);
-    if (m) { locPhoto = `${safeId}_place.webp`; await saveImage(m, locPhoto); }
-    else if (it['地図画像ファイル名']) missing.push(`${it['名前']}（配置の写真）`);
+    // 変換できない形式（HEICなど）が混ざっていても、ほかの物品の変換は続ける
+    const convert = async (recorded, out, label) => {
+      if (!recorded) return '';
+      const src = findFile(dir, recorded);
+      if (!src) { missing.push(`${it['名前']}（${label}）：ZIPに入っていません`); return ''; }
+      try { await saveImage(src, out); return out; }
+      catch (e) { missing.push(`${it['名前']}（${label}）：変換できない形式です ${path.basename(src)}`); return ''; }
+    };
+    const photo = await convert(it['写真ファイル名'], `${safeId}.webp`, '物品写真');
+    const locPhoto = await convert(it['地図画像ファイル名'], `${safeId}_place.webp`, '配置の写真');
     const note = [it['場所コード'] && `場所コード ${it['場所コード']}`, it['メモ']].filter(Boolean).join('／');
     rows.push([
       id, it['名前'], it['カテゴリ'], it['説明'], it['総数'], it['現在の空き数'],
@@ -125,7 +128,9 @@ async function main() {
   console.log(`物品 ${items.length}件を変換しました。`);
   console.log(`  スプレッドシート用: ${path.join(OUT, '物品シート.csv')}`);
   console.log(`  写真: ${path.join(IMG)}`);
-  if (missing.length) console.log(`見つからなかった写真 ${missing.length}件:\n  ${missing.join('\n  ')}`);
+  if (missing.length) console.log(`取り込めなかった写真 ${missing.length}件（管理者画面で撮り直してください）:\n  ${missing.join('\n  ')}`);
+  const skipped = path.join(dir, '書き出せなかった画像.txt');
+  if (fs.existsSync(skipped)) console.log(`\nReplit側で書き出せなかった画像:\n${fs.readFileSync(skipped, 'utf8')}`);
 }
 
 main().catch((e) => { console.error(e.message || e); process.exit(1); });
