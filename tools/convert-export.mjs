@@ -11,7 +11,13 @@ import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), '..');
+// プロジェクトのフォルダで実行する前提（スクリプトの場所から求めると、Windowsでは
+// 仮想化された別のパスになって写真を書き込めないことがある）
+const ROOT = '.'; // 相対パスで扱う（絶対パスだと仮想化された場所を指すことがある）
+if (!fs.existsSync(path.join(ROOT, 'docs', 'index.html'))) {
+  console.error('プロジェクトのフォルダ（docs/index.html がある場所）で実行してください。');
+  process.exit(1);
+}
 const OUT = path.join(ROOT, 'output');
 const IMG = path.join(ROOT, 'docs', 'images');
 
@@ -68,11 +74,14 @@ function findRoot(dir) {
 }
 
 async function saveImage(src, name) {
-  // スマホ写真の向き情報（EXIF）を反映してから縮小する
-  await sharp(src).rotate().resize({ width: 360, height: 360, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: 72 }).toFile(path.join(IMG, 'thumb', name));
-  await sharp(src).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: 80 }).toFile(path.join(IMG, 'full', name));
+  // スマホ写真の向き情報（EXIF）を反映してから縮小する。
+  // 画像ライブラリはWindowsの長いパス（260文字超）に書き込めないため、メモリ上で作ってからNodeで書き込む
+  const thumb = await sharp(src).rotate().resize({ width: 360, height: 360, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 72 }).toBuffer();
+  const full = await sharp(src).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 80 }).toBuffer();
+  fs.writeFileSync(path.join(IMG, 'thumb', name), thumb);
+  fs.writeFileSync(path.join(IMG, 'full', name), full);
 }
 
 async function main() {
@@ -106,7 +115,7 @@ async function main() {
       const src = findFile(dir, recorded);
       if (!src) { missing.push(`${it['名前']}（${label}）：ZIPに入っていません`); return ''; }
       try { await saveImage(src, out); return out; }
-      catch (e) { missing.push(`${it['名前']}（${label}）：変換できない形式です ${path.basename(src)}`); return ''; }
+      catch (e) { missing.push(`${it['名前']}（${label}）：変換できませんでした ${path.basename(src)}（${e.message}）`); return ''; }
     };
     const photo = await convert(it['写真ファイル名'], `${safeId}.webp`, '物品写真');
     const locPhoto = await convert(it['地図画像ファイル名'], `${safeId}_place.webp`, '配置の写真');
