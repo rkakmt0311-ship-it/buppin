@@ -148,7 +148,8 @@ function esc(s) {
 function imageUrl(v, size) {
   if (!v) return '';
   const drive = String(v).match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]+)/);
-  if (drive) return `https://drive.google.com/thumbnail?id=${drive[1]}&sz=w${size}`;
+  // Apps Script は配信時に「//」以降をコメントとして削るため、URLの「//」はエスケープして書く
+  if (drive) return `https:\/\/drive.google.com/thumbnail?id=${drive[1]}&sz=w${size}`;
   if (/^https?:\/\//.test(v)) return v;
   return `${SITE_URL}images/${/\.webp$/i.test(v) ? 'thumb/' : ''}${encodeURIComponent(v)}`;
 }
